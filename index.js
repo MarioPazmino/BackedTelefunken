@@ -1,35 +1,31 @@
-
 // server.js
 const express = require('express');
 const cors = require('cors');
-const db = require('./ConexionFirebase/firebase'); // Importa la conexión a Firestore
-const userRoutes = require('./routes/userRoutes'); // Importa las rutas de usuarios
-
+const db = require('./ConexionFirebase/firebase');
+const routerApi = require('./routes'); // Cambiamos la importación de rutas
 
 // Configurar Express
 const app = express();
 const port = 3000;
 
 // Middleware
-app.use(cors()); // Permitir solicitudes desde otros orígenes
-app.use(express.json()); // Parsear el cuerpo de las solicitudes como JSON
+app.use(cors());
+app.use(express.json());
 
-// Rutas
-app.use('/api/users', userRoutes); // Rutas de usuarios bajo el prefijo /api/users
+// Implementar el sistema de rutas versionadas
+routerApi(app); // Reemplaza la línea app.use('/api/users', userRoutes)
 
 // Limpieza de partidas temporales expiradas
 const cleanupExpiredGames = async () => {
   try {
-    const gamesRef = db.collection('games'); // Referencia a la colección de partidas
+    const gamesRef = db.collection('games');
     const now = new Date();
 
-    // Buscar partidas temporales expiradas
     const snapshot = await gamesRef
       .where('isTemporary', '==', true)
       .where('expiresAt', '<=', now)
       .get();
 
-    // Eliminar partidas expiradas en un lote
     const batch = db.batch();
     snapshot.docs.forEach((doc) => {
       batch.delete(doc.ref);
@@ -43,9 +39,9 @@ const cleanupExpiredGames = async () => {
 };
 
 // Ejecutar la limpieza cada hora
-setInterval(cleanupExpiredGames, 60 * 60 * 1000); // 60 * 60 * 1000 = 1 hora
+setInterval(cleanupExpiredGames, 60 * 60 * 1000);
 
 // Iniciar el servidor
-app.listen(port, () => {
-  console.log(`Servidor corriendo en http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Servidor corriendo en http://0.0.0.0:${port}`);
 });

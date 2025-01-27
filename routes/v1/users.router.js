@@ -1,10 +1,9 @@
-// routes/userRoutes.js
+// routes/v1/users.router.js
 const express = require('express');
+const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../schemas/User');
-
-const router = express.Router();
+const db = require('../../ConexionFirebase/firebase');
 
 // Ruta para registrar un nuevo usuario
 router.post('/register', async (req, res) => {
@@ -15,33 +14,40 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    // Verificar si el correo electrónico o el nombre de usuario ya están registrados
-    const emailExists = await User.where('email', '==', email).get();
-    if (!emailExists.empty) {
+    // Verificar si el email ya existe
+    const emailSnapshot = await db.collection('users')
+      .where('email', '==', email)
+      .get();
+
+    if (!emailSnapshot.empty) {
       return res.status(400).json({ error: 'El correo electrónico ya está registrado' });
     }
 
-    const usernameExists = await User.where('username', '==', username).get();
-    if (!usernameExists.empty) {
+    // Verificar si el username ya existe
+    const usernameSnapshot = await db.collection('users')
+      .where('username', '==', username)
+      .get();
+
+    if (!usernameSnapshot.empty) {
       return res.status(400).json({ error: 'El nombre de usuario ya está registrado' });
     }
 
-    // Encriptar la contraseña antes de guardarla
+    // Encriptar la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear un nuevo usuario
+    // Crear el nuevo usuario
     const newUser = {
       name,
       email,
       username,
       password: hashedPassword,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date()
     };
 
-    // Guardar el usuario en Firestore (la colección "users" se creará automáticamente)
-    const userRef = await User.add(newUser);
-    res.status(201).json({ message: 'Usuario registrado con éxito', userId: userRef.id });
+    // Guardar en Firebase
+    await db.collection('users').add(newUser);
+
+    res.status(201).json({ message: 'Usuario registrado con éxito' });
   } catch (error) {
     console.error('Error al registrar usuario:', error);
     res.status(500).json({ error: 'Hubo un problema al registrar el usuario' });
@@ -57,30 +63,44 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // Buscar el usuario por su nombre de usuario
-    const userSnapshot = await User.where('username', '==', username).get();
+    // Buscar usuario por username
+    const userSnapshot = await db.collection('users')
+      .where('username', '==', username)
+      .get();
+
     if (userSnapshot.empty) {
       return res.status(400).json({ error: 'Usuario no encontrado' });
     }
 
     const userDoc = userSnapshot.docs[0];
-    const user = userDoc.data();
+    const userData = userDoc.data();
 
-    // Verificar la contraseña utilizando bcrypt
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // Verificar contraseña
+    const isPasswordValid = await bcrypt.compare(password, userData.password);
     if (!isPasswordValid) {
       return res.status(400).json({ error: 'Contraseña incorrecta' });
     }
 
-    // Crear el JWT (con un tiempo de expiración de 1 hora)
+    // Crear token
     const token = jwt.sign(
-      { userId: userDoc.id, username: user.username }, // Datos que queremos incluir en el token
-      'secret_key', // Clave secreta para firmar el token (debes usar una clave segura)
-      { expiresIn: '1h' } // Expiración del token en 1 hora
+      { 
+        userId: userDoc.id, 
+        username: userData.username 
+      },
+      process.env.JWT_SECRET || 'secret_key',
+      { expiresIn: '1h' }
     );
 
-    // Login exitoso, se envía el JWT al cliente
-    res.status(200).json({ message: 'Inicio de sesión exitoso', token });
+    res.status(200).json({ 
+      message: 'Inicio de sesión exitoso', 
+      token,
+      user: {
+        id: userDoc.id,
+        name: userData.name,
+        email: userData.email,
+        username: userData.username
+      }
+    });
   } catch (error) {
     console.error('Error al iniciar sesión:', error);
     res.status(500).json({ error: 'Hubo un problema al iniciar sesión' });
