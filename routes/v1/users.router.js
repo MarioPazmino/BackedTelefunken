@@ -107,4 +107,29 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Ruta para verificar si un correo electrónico ya está registrado
+router.get('/check-email', async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ error: 'El correo electrónico es requerido' });
+  }
+
+  try {
+    // Verificar si el email ya existe en la base de datos
+    const emailSnapshot = await db.collection('users')
+      .where('email', '==', email)
+      .get();
+
+    if (!emailSnapshot.empty) {
+      return res.status(200).json({ exists: true }); // El correo ya existe
+    } else {
+      return res.status(200).json({ exists: false }); // El correo no existe
+    }
+  } catch (error) {
+    console.error('Error al verificar el correo electrónico:', error);
+    res.status(500).json({ error: 'Hubo un problema al verificar el correo electrónico' });
+  }
+});
+
 module.exports = router;

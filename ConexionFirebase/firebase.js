@@ -1,3 +1,4 @@
+//conexionfirebase/firebase.js
 const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json'); // Archivo de credenciales de Firebase
 
