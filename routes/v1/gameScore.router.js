@@ -6,11 +6,27 @@ const gameScoreService = require('../../services/gameScoreService');
 // Inicializar un nuevo juego
 router.post('/initialize', async (req, res) => {
   try {
-    const { gameId, players } = req.body;
-    const gameMatch = await gameScoreService.initializeGameMatch(gameId, players);
-    res.status(201).json(gameMatch);
+      console.log('Initialize request body:', req.body);
+      const { gameId, players } = req.body;
+
+if (!gameId || !players) {
+    return res.status(400).json({ 
+        success: false, 
+        message: 'gameId and players are required' 
+    });
+}
+console.log('Initialize request body:', req.body);
+
+
+      const gameMatch = await gameScoreService.initializeGameMatch(gameId, players);
+      res.status(201).json(gameMatch);
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+      console.error('Initialize error:', error);
+      res.status(400).json({ 
+          success: false, 
+          message: error.message,
+          details: error.stack
+      });
   }
 });
 
@@ -26,10 +42,11 @@ router.post('/record-score', async (req, res) => {
 });
 
 // Obtener estado actual del juego
-router.get('/match/:matchId', async (req, res) => {
+// Add this to your router
+router.get('/game/:gameId', async (req, res) => {
   try {
-    const { matchId } = req.params;
-    const matchStatus = await gameScoreService.getMatchStatus(matchId);
+    const { gameId } = req.params;
+    const matchStatus = await GameMatch.findByGameId(gameId);
     res.status(200).json(matchStatus);
   } catch (error) {
     res.status(404).json({ success: false, message: error.message });

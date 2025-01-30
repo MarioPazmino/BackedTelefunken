@@ -4,6 +4,7 @@
 const db = require('../ConexionFirebase/firebase');
 const { v4: uuidv4 } = require('uuid');
 const WaitingRoom = require('../schemas/WaitingRoom');
+const gameScoreService = require('./gameScoreService');
 
 const generateGuestId = () => `guest_${uuidv4()}`;
 
@@ -169,8 +170,23 @@ const startGame = async (gameCode) => {
       throw new Error('No hay suficientes jugadores para comenzar');
     }
 
-    await waitingRoom.update({ status: 'started' });
-    return waitingRoom.toJSON();
+    // Usar initializeGameMatch para crear el partido
+    const activePlayers = waitingRoom.players.filter(p => p.status === 'active');
+    const gameMatch = await gameScoreService.initializeGameMatch(
+      waitingRoom.gameId,
+      activePlayers
+    );
+
+    // Actualizar la sala de espera con el ID del partido
+    await waitingRoom.update({ 
+      status: 'started',
+      matchId: gameMatch.matchId 
+    });
+
+    return {
+      ...waitingRoom.toJSON(),
+      matchId: gameMatch.matchId
+    };
   } catch (error) {
     throw new Error(`Error al iniciar el juego: ${error.message}`);
   }
