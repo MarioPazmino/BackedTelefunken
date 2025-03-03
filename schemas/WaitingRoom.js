@@ -1,19 +1,19 @@
+
 // schemas/WaitingRoom.js
 const db = require('../ConexionFirebase/firebase');
-
-const { v4: uuidv4 } = require('uuid'); // Add missing import
+const { v4: uuidv4 } = require('uuid');
 
 class WaitingRoom {
   constructor(data) {
     if (!data || !data.gameCode) {
-      throw new Error('Invalid waiting room data: missing required fields');
+      throw new Error('Datos de sala de espera inválidos: faltan campos requeridos');
     }
 
     this.roomId = data.roomId || uuidv4();
     this.gameId = data.gameId;
     this.gameCode = data.gameCode;
     this.status = this.validateStatus(data.status || 'waiting');
-    this.minPlayers = data.minPlayers || 3;
+    this.minPlayers = data.minPlayers || 2;
     this.maxPlayers = data.maxPlayers || 6;
     this.players = this.validatePlayers(data.players || []);
     this.activePlayers = this.countActivePlayers();
@@ -24,19 +24,18 @@ class WaitingRoom {
   validateStatus(status) {
     const validStatuses = ['waiting', 'ready', 'started'];
     if (!validStatuses.includes(status)) {
-      throw new Error(`Invalid status: ${status}`);
+      throw new Error(`Estado inválido: ${status}`);
     }
     return status;
   }
 
   validatePlayers(players) {
     if (!Array.isArray(players)) {
-      throw new Error('Players must be an array');
+      throw new Error('Los jugadores deben ser un array');
     }
     return players.map(player => ({
-      id: player.id,
-      type: player.type,
-      name: player.name,
+      id: player.username, // Usamos el username como identificador del jugador
+      username: player.username, // Aseguramos que solo usamos el username
       status: player.status || 'active',
       joinedAt: player.joinedAt || new Date().toISOString()
     }));
@@ -70,7 +69,7 @@ class WaitingRoom {
       await db.collection('waitingRooms').doc(this.roomId).set(this.toJSON());
       return this;
     } catch (error) {
-      throw new Error(`Error saving waiting room: ${error.message}`);
+      throw new Error(`Error al guardar la sala de espera: ${error.message}`);
     }
   }
 
@@ -81,7 +80,7 @@ class WaitingRoom {
       Object.assign(this, updatedRoom);
       return this;
     } catch (error) {
-      throw new Error(`Error updating waiting room: ${error.message}`);
+      throw new Error(`Error al actualizar la sala de espera: ${error.message}`);
     }
   }
 }

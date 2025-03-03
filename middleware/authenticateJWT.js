@@ -12,14 +12,16 @@ const authenticateJWT = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, 'secret_key');
-    const userSnapshot = await User.doc(decoded.userId).get();
+    
+    // Buscar al usuario por username
+    const userSnapshot = await User.where('username', '==', decoded.username).get();
 
-    if (!userSnapshot.exists) {
+    if (userSnapshot.empty) {
       return res.status(401).json({ error: 'Usuario no encontrado' });
     }
 
-    req.user = userSnapshot.data();
-    req.user.userId = userSnapshot.id;
+    const userDoc = userSnapshot.docs[0];
+    req.user = userDoc.data(); // Solo pasamos los datos del usuario, sin userId
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Token no válido' });
