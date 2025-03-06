@@ -1,6 +1,6 @@
 
 // schemas/WaitingRoom.js
-const db = require('../ConexionFirebase/firebase');
+const { admin, db, FieldValue } = require('./../ConexionFirebase/firebase');
 const { v4: uuidv4 } = require('uuid');
 
 class WaitingRoom {

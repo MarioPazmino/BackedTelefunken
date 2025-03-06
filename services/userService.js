@@ -1,8 +1,8 @@
 // services/userService.js
-const admin = require('firebase-admin');
 const bcrypt = require('bcryptjs');
 const User = require('../schemas/User'); // Importa el modelo de usuario
 const jwt = require('jsonwebtoken');
+const { admin, db, FieldValue } = require('./../ConexionFirebase/firebase');
 
 const registerUser = async (userData) => {
   const { email, username, password } = userData;

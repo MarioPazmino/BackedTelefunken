@@ -1,11 +1,5 @@
-
-
-
-
-
-
 // schemas/Game.js
-const db = require('../ConexionFirebase/firebase');
+const { admin, db, FieldValue } = require('./../ConexionFirebase/firebase');
 
 class Game {
   constructor(data) {

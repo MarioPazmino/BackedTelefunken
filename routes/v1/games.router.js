@@ -1,11 +1,10 @@
-
-
 // routes/v1/games.router.js
 
 const express = require('express');
 const router = express.Router();
 const gameService = require('../../services/gameService');
 const gameSessionService = require('../../services/gameSessionService'); 
+const { admin, db, FieldValue } = require('./../../ConexionFirebase/firebase');
 
 // Crear una nueva partida
 router.post('/create', async (req, res) => {

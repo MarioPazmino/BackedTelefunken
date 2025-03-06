@@ -1,12 +1,15 @@
 // schemas/GameSession.js
-const db = require('../ConexionFirebase/firebase');
+const { admin, db, FieldValue } = require('./../ConexionFirebase/firebase');
+
+// schemas/GameSession.js
 
 class GameSession {
   constructor(data) {
     this.gameId = data.gameId;
-    this.dealer = data.dealer; // Usar username en lugar de userId
-    this.currentTurn = data.currentTurn; // Usar username en lugar de userId
-    this.players = this.validatePlayers(data.players || []); // Validar y formatear jugadores
+    this.gameCode = data.gameCode; // Agregar gameCode
+    this.dealer = data.dealer;
+    this.currentTurn = data.currentTurn;
+    this.players = this.validatePlayers(data.players || []);
     this.status = data.status || 'in_progress';
     this.actions = data.actions || [];
     this.jokerUses = data.jokerUses || [];
@@ -31,9 +34,10 @@ class GameSession {
   toJSON() {
     return {
       gameId: this.gameId,
-      dealer: this.dealer, // Usar username en lugar de userId
-      currentTurn: this.currentTurn, // Usar username en lugar de userId
-      players: this.players, // Jugadores ya validados y formateados
+      gameCode: this.gameCode, // Incluir gameCode en el JSON
+      dealer: this.dealer,
+      currentTurn: this.currentTurn,
+      players: this.players,
       status: this.status,
       actions: this.actions,
       jokerUses: this.jokerUses,

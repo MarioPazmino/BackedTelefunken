@@ -3,19 +3,31 @@
 //routes/v1/gameSession.router.js
 const express = require('express');
 const router = express.Router();
+const { admin, db, FieldValue } = require('./../../ConexionFirebase/firebase');
 const gameSessionService = require('../../services/gameSessionService');
 
 module.exports = (io) => { // Aceptar `io` como parámetro
   // Iniciar la partida
-  router.post('/:gameId/start', async (req, res) => {
+  router.post('/:gameId/:gameCode/start', async (req, res) => {
     try {
-      const { gameId } = req.params;
+      const { gameId, gameCode } = req.params;
       const { players } = req.body;
+
+      // Validar que el gameCode coincida con el gameId
+      const waitingRoomSnapshot = await db
+        .collection('waitingRooms')
+        .where('gameCode', '==', gameCode)
+        .where('gameId', '==', gameId)
+        .get();
+
+      if (waitingRoomSnapshot.empty) {
+        return res.status(404).json({ message: 'Sala de espera no encontrada o código de juego inválido' });
+      }
 
       const gameState = await gameSessionService.startGameSession(gameId, players);
 
-      // Emitir evento a todos los clientes en la sala (gameId)
-      io.to(gameId).emit('gameStarted', gameState);
+      // Emitir evento a todos los clientes en la sala (gameCode)
+      io.to(gameCode).emit('gameStarted', gameState);
 
       res.status(200).json(gameState);
     } catch (error) {
@@ -24,15 +36,26 @@ module.exports = (io) => { // Aceptar `io` como parámetro
   });
 
   // Registrar una acción en la partida
-  router.post('/:gameId/action', async (req, res) => {
+  router.post('/:gameId/:gameCode/action', async (req, res) => {
     try {
-      const { gameId } = req.params;
+      const { gameId, gameCode } = req.params;
       const { playerId, action } = req.body;
+
+      // Validar que el gameCode coincida con el gameId
+      const waitingRoomSnapshot = await db
+        .collection('waitingRooms')
+        .where('gameCode', '==', gameCode)
+        .where('gameId', '==', gameId)
+        .get();
+
+      if (waitingRoomSnapshot.empty) {
+        return res.status(404).json({ message: 'Sala de espera no encontrada o código de juego inválido' });
+      }
 
       await gameSessionService.recordAction(gameId, playerId, action);
 
-      // Emitir evento a todos los clientes en la sala (gameId)
-      io.to(gameId).emit('actionRecorded', { playerId, action });
+      // Emitir evento a todos los clientes en la sala (gameCode)
+      io.to(gameCode).emit('actionRecorded', { playerId, action });
 
       res.status(200).json({ success: true });
     } catch (error) {
@@ -41,14 +64,25 @@ module.exports = (io) => { // Aceptar `io` como parámetro
   });
 
   // Finalizar la partida
-  router.post('/:gameId/end', async (req, res) => {
+  router.post('/:gameId/:gameCode/end', async (req, res) => {
     try {
-      const { gameId } = req.params;
+      const { gameId, gameCode } = req.params;
+
+      // Validar que el gameCode coincida con el gameId
+      const waitingRoomSnapshot = await db
+        .collection('waitingRooms')
+        .where('gameCode', '==', gameCode)
+        .where('gameId', '==', gameId)
+        .get();
+
+      if (waitingRoomSnapshot.empty) {
+        return res.status(404).json({ message: 'Sala de espera no encontrada o código de juego inválido' });
+      }
 
       const results = await gameSessionService.endGameSession(gameId);
 
-      // Emitir evento a todos los clientes en la sala (gameId)
-      io.to(gameId).emit('gameEnded', results);
+      // Emitir evento a todos los clientes en la sala (gameCode)
+      io.to(gameCode).emit('gameEnded', results);
 
       res.status(200).json(results);
     } catch (error) {

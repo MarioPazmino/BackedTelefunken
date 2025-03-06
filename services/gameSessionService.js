@@ -1,7 +1,6 @@
-
 // services/gameSessionService.js
-const db = require('../ConexionFirebase/firebase');
 const GameSession = require('../schemas/GameSession');
+const { admin, db, FieldValue } = require('./../ConexionFirebase/firebase');
 
 const assignDealerAndStarter = (players) => {
   const dealerIndex = Math.floor(Math.random() * players.length);
@@ -19,9 +18,9 @@ const assignGameChooser = (players) => {
 
 const recordCardPurchase = async (gameId, username, card, tokensUsed) => {
   await db.collection('gameSessions').doc(gameId).update({
-    actions: admin.firestore.FieldValue.arrayUnion({
+    actions: FieldValue.arrayUnion({  // Ya no usa admin.firestore.FieldValue
       type: 'card_purchase',
-      username, // Cambiar playerId por username
+      username,
       card,
       tokensUsed,
       timestamp: new Date().toISOString(),
@@ -193,14 +192,13 @@ const recordJokerUse = async (gameId, username, jokerCard, context) => {
 };
 
 // Iniciar la partida (asignar dealer, jugador que comienza, etc.)
-const startGameSession = async (gameId, players) => {
+const startGameSession = async (gameId, players, gameCode) => { // Agregar gameCode como parámetro
   try {
-    // Asignar dealer y jugador que comienza
     const { dealer, starter } = assignDealerAndStarter(players);
 
-    // Crear el estado inicial de la partida
     const initialGameState = new GameSession({
       gameId,
+      gameCode, // Incluir gameCode aquí
       dealer,
       currentTurn: starter,
       players,
@@ -210,10 +208,8 @@ const startGameSession = async (gameId, players) => {
       results: {},
     });
 
-    // Guardar el estado inicial en Firestore
     await initialGameState.save();
-
-    return initialGameState.toJSON(); // Devuelve el estado inicial de la sesión del juego
+    return initialGameState.toJSON();
   } catch (error) {
     throw new Error(`Error al iniciar la partida: ${error.message}`);
   }
@@ -251,6 +247,13 @@ const endGameSession = async (gameId) => {
   }
 };
 
+const endTurn = async (gameId, nextPlayer) => {
+  await db.collection('gameSessions').doc(gameId).update({
+    currentTurn: nextPlayer,
+    updatedAt: new Date().toISOString()
+  });
+};
+
 module.exports = {
   assignDealerAndStarter,
   nextTurn,
@@ -273,5 +276,5 @@ module.exports = {
   recordPenalty,
   updateTournamentScores,
   calculateGamePoints,
-
+  endTurn
 };

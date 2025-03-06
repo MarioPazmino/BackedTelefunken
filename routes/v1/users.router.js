@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../../ConexionFirebase/firebase');
+const { admin, db, FieldValue } = require('./../../ConexionFirebase/firebase');
 const userService = require('../../services/userService');
 
 // Ruta para registrar un nuevo usuario

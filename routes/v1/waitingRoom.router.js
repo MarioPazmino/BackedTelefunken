@@ -2,7 +2,7 @@
 // routes/v1/waitingRoom.router.js
 const express = require('express');
 const router = express.Router();
-const db = require('../../ConexionFirebase/firebase'); // Add this import
+const { admin, db, FieldValue } = require('./../../ConexionFirebase/firebase');
 const waitingRoomService = require('../../services/waitingRoomService');
 const WaitingRoom = require('../../schemas/WaitingRoom');
 
@@ -95,9 +95,11 @@ router.post('/create', async (req, res) => {
 });
 
 // Unirse a una sala de espera
+// Unirse a una sala de espera
 router.post('/join', async (req, res) => {
   try {
-    const { gameCode, username, playerType } = req.body; // Recibimos username en lugar de userId
+    const { gameCode, username, playerType } = req.body;
+
     const waitingRoom = await waitingRoomService.joinWaitingRoom(gameCode, username, playerType);
     res.status(200).json(waitingRoom);
   } catch (error) {
@@ -108,14 +110,14 @@ router.post('/join', async (req, res) => {
 // Salir de una sala de espera
 router.post('/leave', async (req, res) => {
   try {
-    const { gameCode, username } = req.body; // Recibimos username en lugar de userId
+    const { gameCode, username } = req.body;
+
     const result = await waitingRoomService.leaveWaitingRoom(gameCode, username);
     res.status(200).json(result);
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 });
-
 // Iniciar el juego desde la sala de espera
 router.post('/start', async (req, res) => {
   try {
@@ -131,5 +133,4 @@ router.post('/start', async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 });
-
 module.exports = router;

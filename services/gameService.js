@@ -1,8 +1,5 @@
-
-
-
 // services/gameService.js
-const db = require('../ConexionFirebase/firebase');
+const { admin, db, FieldValue } = require('./../ConexionFirebase/firebase');
 const { v4: uuidv4 } = require('uuid');
 const waitingRoomService = require('./waitingRoomService');
 const gameSessionService = require('./gameSessionService');

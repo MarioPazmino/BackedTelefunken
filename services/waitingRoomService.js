@@ -1,6 +1,6 @@
 
 //services/waitingRoomService.js
-const db = require('../ConexionFirebase/firebase');
+const { admin, db, FieldValue } = require('./../ConexionFirebase/firebase');
 const { v4: uuidv4 } = require('uuid');
 const WaitingRoom = require('../schemas/WaitingRoom');
 const gameSessionService = require('./gameSessionService'); 
@@ -171,9 +171,14 @@ const startGame = async (gameCode) => {
     }
 
     const activePlayers = waitingRoom.players.filter(p => p.status === 'active');
+    
+    // Extract gameId from the waiting room
+    const gameId = waitingRoom.gameId;
+
     const gameSession = await gameSessionService.startGameSession(
-      waitingRoom.gameId,
-      activePlayers
+      gameId,
+      activePlayers,
+      gameCode // Pasar gameCode aquí
     );
 
     await waitingRoom.update({
@@ -183,13 +188,13 @@ const startGame = async (gameCode) => {
 
     return {
       ...waitingRoom.toJSON(),
-      gameSession
+      gameSession,
+      gameId  // Add gameId to the returned object
     };
   } catch (error) {
     throw new Error(`Error al iniciar el juego: ${error.message}`);
   }
 };
-
 
 module.exports = {
   createWaitingRoom,
