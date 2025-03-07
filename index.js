@@ -13,7 +13,7 @@ const port = 3000;
 
 // Configuración CORS
 const corsOptions = {
-  origin: 'http://localhost:4200',
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -156,3 +156,5 @@ setInterval(async () => {
 server.listen(port, () => {
   console.log(`Servidor activo en puerto ${port}`);
 });
+
+
