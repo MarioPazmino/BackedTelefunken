@@ -80,26 +80,54 @@ module.exports = (io) => { // Aceptar `io` como parámetro
       }
 
       const results = await gameSessionService.endGameSession(gameId);
-
+  const detailedResults = {
+    ...results,
+    roundDetails: gameSession.rounds.map(round => ({
+      name: round.name,
+      points: round.points,
+      winner: round.winner
+    }))
+  };
       // Emitir evento a todos los clientes en la sala (gameCode)
-      io.to(gameCode).emit('gameEnded', results);
+      io.to(gameCode).emit('gameEnded', results, detailedResults);
 
       res.status(200).json(results);
+      res.status(200).json(detailedResults);
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
   });
 
-  // Registrar una compra de carta
-  router.post('/:gameId/record-purchase', async (req, res) => {
+  // Nuevo endpoint para reclamar una ronda
+  router.post('/:gameId/:gameCode/claim-round', async (req, res) => {
     try {
-      const { gameId } = req.params;
-      const { playerId, card, tokensUsed } = req.body;
+      const { gameId, gameCode } = req.params;
+      const { username, tokenCount } = req.body;
 
-      await gameSessionService.recordCardPurchase(gameId, playerId, card, tokensUsed);
+      // Validar sala
+      const waitingRoomSnapshot = await db
+        .collection('waitingRooms')
+        .where('gameCode', '==', gameCode)
+        .where('gameId', '==', gameId)
+        .get();
 
-      // Emitir evento a todos los clientes en la sala (gameId)
-      io.to(gameId).emit('cardPurchased', { playerId, card, tokensUsed });
+      if (waitingRoomSnapshot.empty) {
+        return res.status(404).json({ message: 'Sala no encontrada' });
+      }
+
+      // Ejecutar lógica de reclamo
+      await gameSessionService.claimRound(gameId, username, tokenCount);
+
+      // Obtener datos actualizados de la ronda
+      const gameSessionDoc = await db.collection('gameSessions').doc(gameId).get();
+      const currentRound = gameSessionDoc.data().rounds[gameSessionDoc.data().currentRound];
+
+      // Emitir evento
+      io.to(gameCode).emit('roundClaimed', {
+        username,
+        round: currentRound.name,
+        remainingTokens: 12 - (gameSessionDoc.data().tokensUsed[username] || 0)
+      });
 
       res.status(200).json({ success: true });
     } catch (error) {
@@ -107,16 +135,38 @@ module.exports = (io) => { // Aceptar `io` como parámetro
     }
   });
 
-  // Registrar un descarte de carta
-  router.post('/:gameId/record-discard', async (req, res) => {
+  // Nuevo endpoint para aprobar/rechazar un reclamo
+  router.post('/:gameId/:gameCode/approve-round', async (req, res) => {
     try {
-      const { gameId } = req.params;
-      const { playerId, card } = req.body;
+      const { gameId, gameCode } = req.params;
+      const { approver, approved } = req.body;
 
-      await gameSessionService.recordCardDiscard(gameId, playerId, card);
+      // Validar sala
+      const waitingRoomSnapshot = await db
+        .collection('waitingRooms')
+        .where('gameCode', '==', gameCode)
+        .where('gameId', '==', gameId)
+        .get();
 
-      // Emitir evento a todos los clientes en la sala (gameId)
-      io.to(gameId).emit('cardDiscarded', { playerId, card });
+      if (waitingRoomSnapshot.empty) {
+        return res.status(404).json({ message: 'Sala no encontrada' });
+      }
+
+      // Ejecutar lógica de aprobación
+      await gameSessionService.approveRound(gameId, approver, approved);
+
+      // Obtener datos actualizados
+      const gameSessionDoc = await db.collection('gameSessions').doc(gameId).get();
+      const currentRoundIndex = gameSessionDoc.data().currentRound;
+      const currentRound = gameSessionDoc.data().rounds[currentRoundIndex];
+
+      // Emitir evento
+      io.to(gameCode).emit('roundApproved', {
+        approved,
+        round: currentRound.name,
+        points: currentRound.points,
+        nextRound: gameSessionDoc.data().rounds[currentRoundIndex + 1]?.name || 'Finalizada'
+      });
 
       res.status(200).json({ success: true });
     } catch (error) {
@@ -124,22 +174,65 @@ module.exports = (io) => { // Aceptar `io` como parámetro
     }
   });
 
-  // Registrar un juego completado
-  router.post('/:gameId/record-game-played', async (req, res) => {
+  // Nuevo endpoint para declarar cartas
+  router.post('/:gameId/:gameCode/declare-cards', async (req, res) => {
     try {
-      const { gameId } = req.params;
-      const { playerId, gameType, cards } = req.body;
+      const { gameId, gameCode } = req.params;
+      const { username, declarations } = req.body;
 
-      await gameSessionService.recordGamePlayed(gameId, playerId, gameType, cards);
+      // Validar sala
+      const waitingRoomSnapshot = await db
+        .collection('waitingRooms')
+        .where('gameCode', '==', gameCode)
+        .where('gameId', '==', gameId)
+        .get();
 
-      // Emitir evento a todos los clientes en la sala (gameId)
-      io.to(gameId).emit('gamePlayed', { playerId, gameType, cards });
+      if (waitingRoomSnapshot.empty) {
+        return res.status(404).json({ message: 'Sala no encontrada' });
+      }
+
+      // Ejecutar declaración
+      await gameSessionService.declareCards(gameId, username, declarations);
+
+      // Emitir evento
+      io.to(gameCode).emit('cardsDeclared', {
+        username,
+        declarations,
+        timestamp: new Date().toISOString()
+      });
 
       res.status(200).json({ success: true });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
   });
-
+  // Add this route
+router.get('/:gameId/state', async (req, res) => {
+  try {
+    const gameSessionDoc = await db.collection('gameSessions').doc(req.params.gameId).get();
+    if (!gameSessionDoc.exists) {
+      return res.status(404).json({ message: 'Game not found' });
+    }
+    res.status(200).json(gameSessionDoc.data());
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+// routes/v1/gameSession.router.js
+router.get('/:gameId/:gameCode/round-history', async (req, res) => { 
+  try {
+    const gameSessionDoc = await db.collection('gameSessions').doc(req.params.gameId).get();
+    const rounds = gameSessionDoc.data().rounds.map(round => ({
+      name: round.name,
+      status: round.status,
+      points: round.points,
+      winner: round.winner
+    }));
+    
+    res.status(200).json({ rounds });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
   return router; // Exportar el router una sola vez
 };

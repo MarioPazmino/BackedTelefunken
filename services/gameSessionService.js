@@ -16,122 +16,6 @@ const assignGameChooser = (players) => {
   return players[chooserIndex].username; // Cambiar id por username
 };
 
-const recordCardPurchase = async (gameId, username, card, tokensUsed) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    actions: FieldValue.arrayUnion({  // Ya no usa admin.firestore.FieldValue
-      type: 'card_purchase',
-      username,
-      card,
-      tokensUsed,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const recordCardDiscard = async (gameId, username, card) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    actions: admin.firestore.FieldValue.arrayUnion({
-      type: 'card_discard',
-      username, // Cambiar playerId por username
-      card,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const recordGamePlayed = async (gameId, username, gameType, cards) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    actions: admin.firestore.FieldValue.arrayUnion({
-      type: 'game_played',
-      username, // Cambiar playerId por username
-      gameType,
-      cards,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const recordGameExtension = async (gameId, username, extendedGameType, cardsAdded) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    actions: admin.firestore.FieldValue.arrayUnion({
-      type: 'game_extension',
-      username, // Cambiar playerId por username
-      extendedGameType,
-      cardsAdded,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const calculateGamePoints = (gameType, cards) => {
-  // Lógica para calcular puntos según el tipo de juego y las cartas
-  switch (gameType) {
-    case 'trío':
-      return 10; // Ejemplo: 10 puntos por un trío
-    case 'cuarteto':
-      return 20; // Ejemplo: 20 puntos por un cuarteto
-    case 'escalera':
-      return 30; // Ejemplo: 30 puntos por una escalera
-    default:
-      return 0;
-  }
-};
-
-const recordTokensUsed = async (gameId, username, tokensUsed) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    tokensUsed: admin.firestore.FieldValue.arrayUnion({
-      username, // Cambiar playerId por username
-      tokensUsed,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const recordEarthquake = async (gameId, username) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    specialEvents: admin.firestore.FieldValue.arrayUnion({
-      type: 'earthquake',
-      username, // Cambiar playerId por username
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const recordOutOfTokens = async (gameId, username) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    specialEvents: admin.firestore.FieldValue.arrayUnion({
-      type: 'out_of_tokens',
-      username, // Cambiar playerId por username
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const recordDeckReshuffle = async (gameId) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    specialEvents: admin.firestore.FieldValue.arrayUnion({
-      type: 'deck_reshuffle',
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const recordPenalty = async (gameId, username, reason) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    penalties: admin.firestore.FieldValue.arrayUnion({
-      username, // Cambiar playerId por username
-      reason,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
-
-const updateTournamentScores = async (tournamentId, username, points) => {
-  const tournamentRef = db.collection('tournaments').doc(tournamentId);
-  await tournamentRef.update({
-    [`scores.${username}`]: admin.firestore.FieldValue.increment(points), // Cambiar playerId por username
-  });
-};
 
 const nextTurn = (currentTurn, players) => {
   const currentIndex = players.findIndex(player => player.username === currentTurn); // Cambiar id por username
@@ -149,17 +33,6 @@ const recordAction = async (gameId, username, action) => {
   });
 };
 
-const calculatePoints = (actions) => {
-  const points = {};
-  actions.forEach(action => {
-    if (action.type === 'game_played') {
-      // Calcular puntos según el tipo de juego y las cartas
-      const gamePoints = calculateGamePoints(action.gameType, action.cards);
-      points[action.username] = (points[action.username] || 0) + gamePoints; // Cambiar playerId por username
-    }
-  });
-  return points;
-};
 
 // Determinar el ganador basado en las puntuaciones
 const determineWinner = (points) => {
@@ -180,72 +53,69 @@ const saveGameResults = async (gameId, results) => {
   await gameSessionRef.update({ results });
 };
 
-const recordJokerUse = async (gameId, username, jokerCard, context) => {
-  await db.collection('gameSessions').doc(gameId).update({
-    jokerUses: admin.firestore.FieldValue.arrayUnion({
-      username, // Cambiar playerId por username
-      jokerCard,
-      context,
-      timestamp: new Date().toISOString(),
-    }),
-  });
-};
 
-// Iniciar la partida (asignar dealer, jugador que comienza, etc.)
-const startGameSession = async (gameId, players, gameCode) => { // Agregar gameCode como parámetro
+// Modificación en startGameSession
+const startGameSession = async (gameId, players, gameCode) => {
   try {
     const { dealer, starter } = assignDealerAndStarter(players);
 
     const initialGameState = new GameSession({
       gameId,
-      gameCode, // Incluir gameCode aquí
+      gameCode,
       dealer,
       currentTurn: starter,
       players,
       status: 'in_progress',
       actions: [],
-      jokerUses: [],
       results: {},
+      tokensUsed: players.reduce((acc, p) => ({...acc, [p.username]: 0}), {})
     });
 
     await initialGameState.save();
     return initialGameState.toJSON();
   } catch (error) {
-    throw new Error(`Error al iniciar la partida: ${error.message}`);
+    throw new Error(`Error iniciando partida: ${error.message}`);
   }
 };
 
-// Finalizar la partida (calcular puntuaciones, determinar ganador, etc.)
+
+// Modificación en endGameSession
 const endGameSession = async (gameId) => {
   try {
-    // Obtener la sesión de juego
     const gameSessionDoc = await db.collection('gameSessions').doc(gameId).get();
-    if (!gameSessionDoc.exists) {
-      throw new Error('Sesión de juego no encontrada');
-    }
+    if (!gameSessionDoc.exists) throw new Error('Sesión no encontrada');
 
-    const gameSessionData = gameSessionDoc.data();
+    const gameSession = new GameSession(gameSessionDoc.data());
+    const totalPoints = {};
 
-    // Calcular puntuaciones
-    const points = calculatePoints(gameSessionData.actions);
+    // Inicializar puntos
+    gameSession.players.forEach(p => totalPoints[p.username] = 0);
 
-    // Determinar el ganador
-    const winner = determineWinner(points);
+    // Acumular puntos de todas las rondas
+    gameSession.rounds.forEach(round => {
+      Object.entries(round.points || {}).forEach(([user, pointData]) => {
+        totalPoints[user] += pointData.total || 0;
+      });
+    });
 
-    // Guardar los resultados finales
-    const results = {
-      points,
-      winner,
+    const winner = determineWinner(totalPoints);
+    const results = { 
+      points: totalPoints, 
+      winner, 
       endedAt: new Date().toISOString(),
+      roundDetails: gameSession.rounds.map(r => ({
+        name: r.name,
+        points: r.points,
+        winner: r.winner
+      }))
     };
 
     await saveGameResults(gameId, results);
-
     return results;
   } catch (error) {
-    throw new Error(`Error al finalizar la partida: ${error.message}`);
+    throw new Error(`Error finalizando partida: ${error.message}`);
   }
-};
+}
 
 const endTurn = async (gameId, nextPlayer) => {
   await db.collection('gameSessions').doc(gameId).update({
@@ -254,27 +124,164 @@ const endTurn = async (gameId, nextPlayer) => {
   });
 };
 
+
+// Reclamar una ronda
+const claimRound = async (gameId, username, tokenCount) => {
+  const gameSessionDoc = await db.collection('gameSessions').doc(gameId).get();
+  const gameSession = new GameSession(gameSessionDoc.data());
+  const currentRound = gameSession.rounds[gameSession.currentRound];
+
+  if (currentRound.status !== 'pending') {
+    throw new Error('Esta ronda ya ha sido finalizada');
+  }
+
+  if ((gameSession.tokensUsed[username] || 0) + tokenCount > 12) {
+    throw new Error('Excediste el límite de fichas');
+  }
+
+  await db.collection('gameSessions').doc(gameId).update({
+    [`tokensUsed.${username}`]: FieldValue.increment(tokenCount),
+    [`rounds.${gameSession.currentRound}.claimedBy`]: username
+  });
+}
+
+// Aprobar/Rechazar un reclamo
+// Modificar función approveRound
+const approveRound = async (gameId, approver, approved) => {
+  const gameSessionDoc = await db.collection('gameSessions').doc(gameId).get();
+  const gameSession = new GameSession(gameSessionDoc.data());
+  const currentRound = gameSession.rounds[gameSession.currentRound];
+
+  if (!currentRound.claimedBy) {
+    throw new Error('Ningún jugador ha reclamado esta ronda');
+  }
+
+  if (approver === currentRound.claimedBy) {
+    throw new Error('El reclamante no puede validar su propia jugada');
+  }
+
+  const updateData = {};
+  const points = {};
+
+  if (approved) {
+    // Asignar 0 puntos al reclamante
+    points[currentRound.claimedBy] = {
+      total: 0,
+      declarations: {},
+      penalty: 0
+    };
+
+    // Calcular puntos para otros jugadores
+    gameSession.players.forEach(player => {
+      if (player.username !== currentRound.claimedBy) {
+        const declarations = currentRound.declarations?.[player.username] || {};
+        points[player.username] = {
+          total: calculatePoints(declarations),
+          declarations,
+          penalty: 0
+        };
+      }
+    });
+    
+    updateData[`rounds.${gameSession.currentRound}.status`] = 'completed';
+    updateData[`rounds.${gameSession.currentRound}.winner`] = currentRound.claimedBy;
+  } else {
+    // Penalizar al reclamante
+    points[currentRound.claimedBy] = {
+      total: 50,
+      declarations: currentRound.declarations?.[currentRound.claimedBy] || {},
+      penalty: 50
+    };
+
+    // Calcular puntos para otros jugadores
+    gameSession.players.forEach(player => {
+      if (player.username !== currentRound.claimedBy) {
+        const declarations = currentRound.declarations?.[player.username] || {};
+        points[player.username] = {
+          total: calculatePoints(declarations),
+          declarations,
+          penalty: 0
+        };
+      }
+    });
+    
+    updateData[`rounds.${gameSession.currentRound}.status`] = 'penalized';
+  }
+
+  updateData[`rounds.${gameSession.currentRound}.points`] = points;
+
+  // Actualizar estado de ronda
+  await db.collection('gameSessions').doc(gameId).update(updateData);
+
+  // Pasar a siguiente ronda o finalizar juego
+  if (gameSession.currentRound < 6) {
+    await db.collection('gameSessions').doc(gameId).update({
+      currentRound: gameSession.currentRound + 1,
+      currentTurn: gameSession.dealer // El dealer siempre inicia la siguiente ronda
+    });
+  } else {
+    await endGameSession(gameId);
+  }
+}
+
+// Declarar cartas
+const declareCards = async (gameId, username, declarations) => {
+  const gameSessionDoc = await db.collection('gameSessions').doc(gameId).get();
+  const gameSession = new GameSession(gameSessionDoc.data());
+  const currentRound = gameSession.rounds[gameSession.currentRound];
+
+  if (currentRound.status !== 'pending') {
+    throw new Error('Esta ronda ya ha sido finalizada');
+  }
+
+  if (currentRound.claimedBy === username) {
+    throw new Error('El reclamante no puede declarar cartas');
+  }
+
+  await db.collection('gameSessions').doc(gameId).update({
+    [`rounds.${gameSession.currentRound}.declarations.${username}`]: declarations
+  });
+}
+
+// Calcular puntos basados en declaraciones
+const calculatePoints = (declarations) => {
+  let total = 0;
+  for (const [card, count] of Object.entries(declarations)) {
+    switch(card) {
+      case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+        total += count * 5;
+        break;
+      case '10': case 'J': case 'Q': case 'K':
+        total += count * 10;
+        break;
+      case 'A':
+        total += count * 15;
+        break;
+      case 'Joker':
+        total += count * 50;
+        break;
+      default:
+        throw new Error(`Carta no válida: ${card}`);
+    }
+  }
+  return total;
+}
+
+
+
+
 module.exports = {
   assignDealerAndStarter,
   nextTurn,
   recordAction,
-  calculatePoints,
   determineWinner,
   saveGameResults,
-  recordJokerUse,
   startGameSession,
   endGameSession,
-  recordCardPurchase,
   assignGameChooser,
-  recordCardDiscard,
-  recordGamePlayed,
-  recordGameExtension,
-  recordTokensUsed,
-  recordEarthquake,
-  recordOutOfTokens,
-  recordDeckReshuffle,
-  recordPenalty,
-  updateTournamentScores,
-  calculateGamePoints,
-  endTurn
+  endTurn,
+  claimRound,
+  approveRound,
+  declareCards,
+  calculatePoints
 };
